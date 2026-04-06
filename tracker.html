@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Location Tracker</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 20px;
+            flex: 1;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.2em;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+
+        .status {
+            background: rgba(255,255,255,0.2);
+            padding: 15px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .status.success {
+            background: rgba(46, 204, 113, 0.3);
+            color: #2ecc71;
+        }
+
+        .status.error {
+            background: rgba(231, 76, 60, 0.3);
+            color: #e74c3c;
+        }
+
+        .location-card {
+            background: rgba(255,255,255,0.95);
+            border-radius: 20px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .location-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .coords {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .coord-item {
+            text-align: center;
+            padding: 15px;
+            background: #f8f9ff;
+            border-radius: 12px;
+            border-left: 4px solid #667eea;
+        }
+
+        .coord-label {
+            font-size: 0.85em;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 5px;
+        }
+
+        .coord-value {
+            font-size: 1.4em;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .accuracy {
+            text-align: center;
+            padding: 12px;
+            background: #e8f4fd;
+            border-radius: 10px;
+            border: 1px solid #b8daff;
+            color: #0c5460;
+            font-size: 0.9em;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 15px 20px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #545b62;
+            transform: translateY(-2px);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .map-container {
+            height: 300px;
+            background: #e9ecef;
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 20px 0;
+            position: relative;
+        }
+
+        .map-placeholder {
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #6c757d;
+            font-size: 1.1em;
+        }
+
+        .history {
+            max-height: 200px;
+            overflow-y: auto;
+            background: rgba(255,255,255,0.95);
+            border-radius: 15px;
+            padding: 15px;
+        }
+
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+            font-size: 0.9em;
+        }
+
+        .history-item:last-child {
+            border-bottom: none;
+        }
+
+        @media (max-width: 480px) {
+            .coords {
+                grid-template-columns: 1fr;
+            }
+            
+            .controls {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📍 Live Tracker</h1>
+            <p>Real-time mobile location sharing</p>
+        </div>
+
+        <div id="status" class="status">Click "Start Tracking" to begin</div>
+
+        <div id="locationCard" class="location-card" style="display: none;">
+            <div class="coords">
+                <div class="coord-item">
+                    <div class="coord-label">Latitude</div>
+                    <div id="latitude" class="coord-value">--</div>
+                </div>
+                <div class="coord-item">
+                    <div class="coord-label">Longitude</div>
+                    <div id="longitude" class="coord-value">--</div>
+                </div>
+            </div>
+
+            <div id="accuracy" class="accuracy" style="display: none;">
+                📏 Accuracy: <span id="accuracyValue">--</span>m
+            </div>
+
+            <div class="map-container">
+                <div class="map-placeholder">
+                    🗺️ Static Map Coming Soon
+                </div>
+            </div>
+
+            <div class="history" id="history" style="display: none;">
+                <div style="font-weight: 600; margin-bottom: 10px; color: #333;">📋 Recent Locations</div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button id="startBtn" class="btn btn-primary">Start Tracking</button>
+            <button id="stopBtn" class="btn btn-secondary" disabled>Stop</button>
+        </div>
+    </div>
+
+    <script>
+        class LocationTracker {
+            constructor() {
+                this.watchId = null;
+                this.tracking = false;
+                this.history = [];
+                this.init();
+            }
+
+            init() {
+                this.startBtn = document.getElementById('startBtn');
+                this.stopBtn = document.getElementById('stopBtn');
+                this.statusEl = document.getElementById('status');
+                this.locationCard = document.getElementById('locationCard');
+                this.latitudeEl = document.getElementById('latitude');
+                this.longitudeEl = document.getElementById('longitude');
+                this.accuracyEl = document.getElementById('accuracy');
+                this.accuracyValueEl = document.getElementById('accuracyValue');
+                this.historyEl = document.getElementById('history');
+
+                this.bindEvents();
+            }
+
+            bindEvents() {
+                this.startBtn.addEventListener('click', () => this.startTracking());
+                this.stopBtn.addEventListener('click', () => this.stopTracking());
+            }
+
+            async startTracking() {
+                if (this.tracking) return;
+
+                try {
+                    this.setStatus('Requesting location access...', 'info');
+                    
+                    // Check if geolocation is supported
+                    if (!navigator.geolocation) {
+                        throw new Error('Geolocation is not supported by this browser');
+                    }
+
+                    // Request high accuracy
+                    this.watchId = navigator.geolocation.watchPosition(
+                        (position) => this.onLocationUpdate(position),
+                        (error) => this.onLocationError(error),
+                        {
+                            enableHighAccuracy: true,
+                            timeout: 10000,
+                            maximumAge: 5000
+                        }
+                    );
+
+                    this.tracking = true;
+                    this.updateUI();
+                    
+                } catch (error) {
+                    this.setStatus(`Error: ${error.message}`, 'error');
+                }
+            }
+
+            stopTracking() {
+                if (this.watchId !== null) {
+                    navigator.geolocation.clearWatch(this.watchId);
+                    this.watchId = null;
+                }
+                this.tracking = false;
+                this.updateUI();
+                this.setStatus('Tracking stopped', 'info');
+                this.locationCard.style.display = 'none';
+            }
+
+            onLocationUpdate(position) {
+                const { latitude, longitude, accuracy } = position.coords;
+                
+                this.latitudeEl.textContent = latitude.toFixed(6);
+                this.longitudeEl.textContent = longitude.toFixed(6);
+                
+                if (accuracy) {
+                    this.accuracyValueEl.textContent = Math.round(accuracy);
+                    this.accuracyEl.style.display = 'block';
+                }
+
+                this.locationCard.style.display = 'block';
+                this.setStatus('✅ Tracking active - Location updated', 'success');
+
+                // Add to history
+                this.addToHistory(latitude, longitude, accuracy);
+
+                // Generate shareable link (simplified)
+                console.log(`Current position: https://www.google.com/maps?q=${latitude},${longitude}`);
+            }
+
+            onLocationError(error) {
+                let message = 'Location access denied or unavailable';
+                switch (error.code) {
+                    case error.PERMISSION_DENIED:
+                        message = 'Location access denied by user';
+                        break;
+                    case error.POSITION_UNAVAILABLE:
+                        message = 'Location information unavailable';
+                        break;
+                    case error.TIMEOUT:
+                        message = 'Location request timeout';
+                        break;
+                }
+                this.setStatus(`❌ ${message}`, 'error');
+            }
+
+            addToHistory(lat, lng, accuracy) {
+                const timestamp = new Date().toLocaleTimeString();
+                this.history.unshift({
+                    lat,
+                    lng,
+                    accuracy: Math.round(accuracy),
+                    timestamp
+                });
+
+                // Keep only last 10 entries
+                if (this.history.length > 10) {
+                    this.history = this.history.slice(0, 10);
+                }
+
+                this.updateHistory();
+            }
+
+            updateHistory() {
+                if (!this.historyEl.style.display) {
+                    this.historyEl.style.display = 'block';
+                }
+
+                this.historyEl.innerHTML = '<div style="font-weight: 600; margin-bottom: 10px; color: #333;">📋 Recent Locations</div>';
+                
+                this.history.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'history-item';
+                    div.innerHTML = `
+                        <span>${item.timestamp}</span>
+                        <span>${item.lat.toFixed(4)}, ${item.lng.toFixed(4)}</span>
+                        <span>${item.accuracy}m</span>
+                    `;
+                    this.historyEl.appendChild(div);
+                });
+            }
+
+            updateUI() {
+                this.startBtn.disabled = this.tracking;
+                this.stopBtn.disabled = !this.tracking;
+                this.startBtn.textContent = this.tracking ? 'Tracking...' : 'Start Tracking';
+            }
+
+            setStatus(message, type = 'info') {
+                this.statusEl.textContent = message;
+                this.statusEl.className = `status ${type}`;
+            }
+        }
+
+        // Initialize tracker when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new LocationTracker();
+        });
+
+        // Handle page visibility change (pause tracking when tab is hidden)
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                console.log('Page hidden - tracking continues in background');
+            }
+        });
+    </script>
+</body>
+</html>
